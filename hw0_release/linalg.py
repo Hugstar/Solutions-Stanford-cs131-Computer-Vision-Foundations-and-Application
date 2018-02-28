@@ -32,6 +32,7 @@ def matrix_mult(M, vector1, vector2):
     """
     out = None
     ### YOUR CODE HERE
+
     out = np.matmul(vector1.T, vector2) *  np.matmul(M, vector1)
 
     ### END YOUR CODE
@@ -88,7 +89,9 @@ def eigen_decomp(matrix):
     w = None
     v = None
     ### YOUR CODE HERE
-    pass
+
+    w,v = np.linalg.eig(matrix)
+
     ### END YOUR CODE
     return w, v
 
@@ -106,6 +109,9 @@ def get_eigen_values_and_vectors(matrix, num_values):
     eigen_values = []
     eigen_vectors = []
     ### YOUR CODE HERE
-    pass
+
+    eigen_values = w[0:num_values]
+    eigen_vectors= v[0:num_values]
+
     ### END YOUR CODE
     return eigen_values, eigen_vectors
