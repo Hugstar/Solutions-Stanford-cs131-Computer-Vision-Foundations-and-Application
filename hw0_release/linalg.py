@@ -11,8 +11,11 @@ def dot_product(vector1, vector2):
         out: numpy array of shape (x,x) (scalar if x = 1)
     """
     out = None
+
     ### YOUR CODE HERE
-    pass
+
+    out = np.dot(vector1, vector2)
+
     ### END YOUR CODE
 
     return out
@@ -29,7 +32,8 @@ def matrix_mult(M, vector1, vector2):
     """
     out = None
     ### YOUR CODE HERE
-    pass
+    out = np.matmul(vector1.T, vector2) *  np.matmul(M, vector1)
+
     ### END YOUR CODE
 
     return out
@@ -48,7 +52,9 @@ def svd(matrix):
     s = None
     v = None
     ### YOUR CODE HERE
-    pass
+
+    u, s, v = np.linalg.svd(matrix)
+
     ### END YOUR CODE
 
     return u, s, v
@@ -65,7 +71,9 @@ def get_singular_values(matrix, n):
     singular_values = None
     u, s, v = svd(matrix)
     ### YOUR CODE HERE
-    pass
+
+    singular_values = s[0:n]
+
     ### END YOUR CODE
     return singular_values
 
