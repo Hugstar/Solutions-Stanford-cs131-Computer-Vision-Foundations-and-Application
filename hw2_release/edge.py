@@ -47,12 +47,20 @@ def gaussian_kernel(size, sigma):
 
     Returns:
         kernel: numpy array of shape (size, size)
-    """  
-    
-    kernel = np.zeros((size, size))
+    """
 
+    kernel = np.zeros((size, size))
+    fixed_size = (size-1) / 2
     ### YOUR CODE HERE
-    pass
+
+    denominator =  1 / (2 * np.pi * sigma**2)
+    for i in range(size):
+        for j in range(size):
+            kernel[i][j] = denominator * np.exp((-1) * ((i-fixed_size)**2 + (j-fixed_size)**2)/(2*(sigma**2)))
+            print ('i {}, j {}, ((i-fixed_size)**2 + (j-fixed_size)**2 {})'.format(i,j, ((i-fixed_size)**2 + (j-fixed_size)**2)))
+    print (kernel)
+
+
     ### END YOUR CODE
 
     return kernel
