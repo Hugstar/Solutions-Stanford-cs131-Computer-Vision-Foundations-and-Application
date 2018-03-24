@@ -1,5 +1,4 @@
 import numpy as np
-
 def conv(image, kernel):
     """ An implementation of convolution filter.
 
@@ -26,8 +25,16 @@ def conv(image, kernel):
     pad_width = ((pad_width0,pad_width0),(pad_width1,pad_width1))
     padded = np.pad(image, pad_width, mode='edge')
 
+
     ### YOUR CODE HERE
-    pass
+    delta_h = int((Hk - 1) / 2)
+    delta_w = int((Wk - 1) / 2)
+    for image_h in range(0, Hi):
+        for image_w in range(0, Wi):
+            out[image_h][image_w] = np.sum(
+                # Notice: we shift the image by [pad_width0, pad_width1]
+                kernel * padded[pad_width0 + image_h - delta_h:pad_width0 + image_h + delta_h + 1,
+                         pad_width1 + image_w - delta_w : pad_width1 + image_w + delta_w + 1])
     ### END YOUR CODE
 
     return out
@@ -35,35 +42,31 @@ def conv(image, kernel):
 def gaussian_kernel(size, sigma):
     """ Implementation of Gaussian Kernel.
     
-    This function follows the gaussian kernel formula,
-    and creates a kernel matrix.
+    This function follows the gaussian filter_values formula,
+    and creates a filter_values matrix.
 
     Hints:
     - Use np.pi and np.exp to compute pi and exp
     
     Args:
         size: int of the size of output matrix
-        sigma: float of sigma to calculate kernel
+        sigma: float of sigma to calculate filter_values
 
     Returns:
-        kernel: numpy array of shape (size, size)
+        filter_values: numpy array of shape (size, size)
     """
 
-    kernel = np.zeros((size, size))
-    fixed_size = (size-1) / 2
-    ### YOUR CODE HERE
+    filter_values = np.zeros((size, size))
+    delta = (size-1) / 2
 
-    denominator =  1 / (2 * np.pi * sigma**2)
+    ### YOUR CODE HERE
     for i in range(size):
         for j in range(size):
-            kernel[i][j] = denominator * np.exp((-1) * ((i-fixed_size)**2 + (j-fixed_size)**2)/(2*(sigma**2)))
-            print ('i {}, j {}, ((i-fixed_size)**2 + (j-fixed_size)**2 {})'.format(i,j, ((i-fixed_size)**2 + (j-fixed_size)**2)))
-    print (kernel)
-
-
+            filter_values[i][j] = (1.0 /(2.0 * np.pi * sigma**2)) * \
+                           np.exp(((-1.0) * ((i-delta)**2 + (j-delta)**2))/(2 * (sigma ** 2)))
     ### END YOUR CODE
 
-    return kernel
+    return filter_values
 
 def partial_x(img):
     """ Computes partial x-derivative of input img.
@@ -80,7 +83,8 @@ def partial_x(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    filter = np.array([-0.5,0,0.5]).reshape((1, 3))
+    out = conv(np.array(img),filter)
     ### END YOUR CODE
 
     return out
@@ -100,7 +104,8 @@ def partial_y(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    filter = np.array([-0.5, 0, 0.5]).reshape((3, 1))
+    out = conv(np.array(img), filter)
     ### END YOUR CODE
 
     return out
@@ -121,7 +126,8 @@ def gradient(img):
     theta = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+    G = np.sqrt(partial_x(img)**2 + partial_y(img)**2)
+    theta = (np.rad2deg(np.arctan2(partial_y(img), partial_x(img)))+180)%360
     ### END YOUR CODE
 
     return G, theta
@@ -147,7 +153,25 @@ def non_maximum_suppression(G, theta):
     theta = np.floor((theta + 22.5) / 45) * 45
 
     ### BEGIN YOUR CODE
-    pass
+    theta = theta%360
+    for i in range(1, H-1):
+        for j in range(1,W-1):
+            current_angle = theta[i,j]
+            if current_angle == 0 or current_angle == 180:
+                neighbors = [G[i, j-1], G[i, j+1]]
+            elif current_angle == 45 or current_angle == 225:
+                neighbors = [G[i-1, j-1], G[i+1, j+1]]
+            elif current_angle == 90 or current_angle == 270:
+                neighbors = [G[i-1, j], G[i+1, j]]
+            elif current_angle == 135 or current_angle == 315:
+                neighbors = [G[i-1, j+1], G[i+1, j-1]]
+            else:
+                raise RuntimeError("Wrong theta value {}- should be one of the following[0,45,90,135,180,225,270,315]".format(current_angle))
+            if G[i,j] >= np.max(neighbors):
+                out[i,j] = G[i,j]
+            else:
+                out[i, j] = 0
+
     ### END YOUR CODE
 
     return out
@@ -172,7 +196,9 @@ def double_thresholding(img, high, low):
     weak_edges = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+    strong_edges = img > high
+    weak_edges = (img < high) & (img > low)
+
     ### END YOUR CODE
 
     return strong_edges, weak_edges
@@ -223,9 +249,13 @@ def link_edges(strong_edges, weak_edges):
     H, W = strong_edges.shape
     indices = np.stack(np.nonzero(strong_edges)).T
     edges = np.zeros((H, W))
-
     ### YOUR CODE HERE
-    pass
+    edges = np.copy(strong_edges)
+    for i in range(0,H-1):
+        for j in range(0, W-1):
+            neighors = get_neighbors(j,i,H,W)
+            if weak_edges[i,j] and np.any(edges[x,y] for x,y in neighors):
+                edges[i,j] = True
     ### END YOUR CODE
 
     return edges
@@ -243,7 +273,11 @@ def canny(img, kernel_size=5, sigma=1.4, high=20, low=15):
         edge: numpy array of shape(H, W)
     """
     ### YOUR CODE HERE
-    pass
+    img = conv(img,gaussian_kernel(kernel_size, sigma))
+    G,theta = gradient(img)
+    G = non_maximum_suppression(G, theta)
+    strong_edges, weak_edges = double_thresholding(G,high,low)
+    edge = link_edges(strong_edges, weak_edges)
     ### END YOUR CODE
 
     return edge
@@ -269,21 +303,26 @@ def hough_transform(img):
     diag_len = int(np.ceil(np.sqrt(W * W + H * H)))
     rhos = np.linspace(-diag_len, diag_len, diag_len * 2.0 + 1)
     thetas = np.deg2rad(np.arange(-90.0, 90.0))
-
     # Cache some reusable values
     cos_t = np.cos(thetas)
     sin_t = np.sin(thetas)
     num_thetas = len(thetas)
-
     # Initialize accumulator in the Hough space
     accumulator = np.zeros((2 * diag_len + 1, num_thetas), dtype=np.uint64)
     ys, xs = np.nonzero(img)
-
     # Transform each point (x, y) in image
     # Find rho corresponding to values in thetas
     # and increment the accumulator in the corresponding coordiate.
     ### YOUR CODE HERE
-    pass
+
+    # it might be better to work with a sparse matrix representation (as opposed to dense representation)
+    for y,x in zip(ys, xs):
+        for t_idx, theta in enumerate(thetas):
+            rho = x*cos_t[t_idx] + y * sin_t[t_idx]
+            # Finding our idx in the linear space
+            rho_idx = int(rho +diag_len)
+            accumulator[rho_idx, t_idx]+=1
+
     ### END YOUR CODE
 
     return accumulator, rhos, thetas
