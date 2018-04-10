@@ -1,4 +1,5 @@
 import numpy as np
+import functools
 def conv(image, kernel):
     """ An implementation of convolution filter.
 
@@ -251,11 +252,35 @@ def link_edges(strong_edges, weak_edges):
     edges = np.zeros((H, W))
     ### YOUR CODE HERE
     edges = np.copy(strong_edges)
-    for i in range(0,H-1):
-        for j in range(0, W-1):
-            neighors = get_neighbors(j,i,H,W)
-            if weak_edges[i,j] and np.any(edges[x,y] for x,y in neighors):
-                edges[i,j] = True
+    # Perform BFS!
+    nodes_to_visit=[]
+    visited_nodes = np.zeros_like(edges)
+    nodes_to_visit.append((0,0))
+    # While our nodes queue is not empty
+    while len(nodes_to_visit) != 0:
+            # Take the first element in the list
+            curr_i, curr_j = nodes_to_visit.pop(0)
+
+            # If we already visited this node - just continue
+            if visited_nodes[curr_i, curr_j] == 1:
+                continue
+
+            # Mark node as visited
+            visited_nodes[curr_i, curr_j] = 1
+
+            neighors = get_neighbors(curr_i, curr_j, H, W)
+
+            # Add neighbors
+            for x,y in neighors:
+                nodes_to_visit.append((x,y))
+
+            # Check for adjacent edges
+            adjacent_edges = False
+            for x,y in neighors:
+                adjacent_edges = edges[x, y] or adjacent_edges
+
+            if weak_edges[curr_i,curr_j] and adjacent_edges:
+                edges[curr_i,curr_j] = True
     ### END YOUR CODE
 
     return edges
