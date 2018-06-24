@@ -3,7 +3,7 @@ from skimage import filters
 from skimage.util.shape import view_as_blocks
 from scipy.spatial.distance import cdist
 from scipy.ndimage.filters import convolve
-
+import random
 from utils import pad, unpad
 
 
@@ -32,9 +32,29 @@ def harris_corners(img, window_size=3, k=0.04):
 
     dx = filters.sobel_v(img)
     dy = filters.sobel_h(img)
-
+    delta = window_size // 2
     ### YOUR CODE HERE
-    pass
+
+    dx_squared = dx ** 2
+    dy_squared = dy ** 2
+    dx_dy_multiplied = dx * dy
+    for i in range(delta,H - delta):
+        for j in range(delta, W - delta):
+            idx_x_start = i-delta
+            idx_x_end = i+delta+1
+
+            idx_y_start = j - delta
+            idx_y_end = j + delta + 1
+
+            sum_dx_squared = np.sum(window * dx_squared[idx_x_start:idx_x_end,idx_y_start:idx_y_end])
+            sum_dy_squared = np.sum(window * dy_squared[idx_x_start:idx_x_end,idx_y_start:idx_y_end])
+            sum_dx_dy_multiplied = np.sum(window * (dx_dy_multiplied[idx_x_start:idx_x_end,idx_y_start:idx_y_end]))
+
+            matrix = np.array([[sum_dx_squared, sum_dx_dy_multiplied],
+                                [sum_dx_dy_multiplied, sum_dy_squared]])
+            response[i][j] = np.linalg.det(matrix) - (k*((np.trace(matrix))**2))
+
+
     ### END YOUR CODE
 
     return response
@@ -58,9 +78,14 @@ def simple_descriptor(patch):
     Returns:
         feature: 1D array of shape (h * w)
     """
-    feature = []
+
     ### YOUR CODE HERE
-    pass
+
+    std = np.std(patch)
+    if std == 0:
+        std = 1
+    feature = ((patch - np.mean(patch)) / std).flatten()
+
     ### END YOUR CODE
     return feature
 
@@ -107,10 +132,18 @@ def match_descriptors(desc1, desc2, threshold=0.5):
     matches = []
     
     N = desc1.shape[0]
+    print(desc1.shape, desc2.shape)
     dists = cdist(desc1, desc2)
 
     ### YOUR CODE HERE
-    pass
+    for descriptor_idx, distance_for_descriptor in enumerate(dists):
+        smallest_distance, second_smallest_distance = np.sort(distance_for_descriptor)[0:2]
+        idx_smallest_value = np.nonzero(distance_for_descriptor == smallest_distance)[0][0]
+        ratio = smallest_distance / second_smallest_distance
+        if ratio < threshold:
+            matches.append([descriptor_idx, idx_smallest_value])
+    matches = np.array(matches)
+
     ### END YOUR CODE
     
     return matches
@@ -136,7 +169,9 @@ def fit_affine_matrix(p1, p2):
     p2 = pad(p2)
 
     ### YOUR CODE HERE
-    pass
+
+    H, _, _, _ = np.linalg.lstsq(p2,p1)
+
     ### END YOUR CODE
 
     # Sometimes numerical issues cause least-squares to produce the last
@@ -169,18 +204,42 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
     """
     N = matches.shape[0]
     n_samples = int(N * 0.2)
-
     matched1 = pad(keypoints1[matches[:,0]])
     matched2 = pad(keypoints2[matches[:,1]])
-
-    max_inliers = np.zeros(N)
+    max_inliers = np.zeros(N,dtype='uint16')
     n_inliers = 0
-
+    H = None
     # RANSAC iteration start
+
     ### YOUR CODE HERE
-    pass
+
+    for i in range(n_iters):
+        n_inliers = 0
+        current_inliers = np.zeros(N,dtype='uint16')
+        # 1. Select random points
+        random_indices = random.sample(range(matched1.shape[0]), n_samples)
+        random_matched1 = [matched1[i] for i in random_indices]
+        random_matched2 = [matched2[i] for i in random_indices]
+
+        # 2. Compute affine transformation matrix
+        affine_transformation_matrix, _, _, _ = np.linalg.lstsq(random_matched2, random_matched1)
+
+        #3. Detected inliers
+        for i in range(len(matched1)):
+            if np.sum((matched1[i] - np.matmul(matched2[i],affine_transformation_matrix))**2) < threshold:
+                current_inliers[i] = 1
+                n_inliers += 1
+        # 4. Keep the largest set of inliers
+        if n_inliers > np.sum(max_inliers):
+            max_inliers = np.copy(current_inliers)
+            H = affine_transformation_matrix
+
+    # 5. Re-compute least-squares estimate on all of the inliers
+
+    affine_transformation_matrix, _, _, _ = np.linalg.lstsq(keypoints2[matches[max_inliers][:,1]],
+                                                            keypoints1[matches[max_inliers][:,0]])
     ### END YOUR CODE
-    return H, matches[max_inliers]
+    return H, np.array([matches[i] for i in range(np.array(max_inliers).shape[0]) if max_inliers[i]==1])
 
 
 def hog_descriptor(patch, pixels_per_cell=(8,8)):
@@ -223,7 +282,7 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
 
     # Compute histogram per cell
     ### YOUR CODE HERE
-    pass
+
     ### YOUR CODE HERE
     
     return block
