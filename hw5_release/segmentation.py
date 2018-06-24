@@ -33,12 +33,25 @@ def kmeans(features, k, num_iters=100):
     idxs = np.random.choice(N, size=k, replace=False)
     centers = features[idxs]
     assignments = np.zeros(N)
-
+    prev_assignments = assignments.copy()
     for n in range(num_iters):
-        ### YOUR CODE HERE
-        pass
-        ### END YOUR CODE
+        # Calculate nearest center
+        for i, feature in enumerate(features):
+            # print('len assignments {}, i {}'.format(len(assignments), i))
+            assignments[i] = np.argmin([np.linalg.norm(feature-x) for x in centers])
+        # Update centers
 
+        for j in range(k):
+            points_belonging_to_center = [features[x] for x in range(k) if assignments[x]== j]
+            if len(points_belonging_to_center) != 0:
+                centers[j] = np.mean(points_belonging_to_center, axis=0)
+            print ('j ', j , centers[j])
+        ### END YOUR CODE
+        if np.array_equal(prev_assignments, assignments):
+            return assignments
+        else:
+            prev_assignments = assignments.copy()
+    print (np.unique(assignments, return_counts=True))
     return assignments
 
 def kmeans_fast(features, k, num_iters=100):
