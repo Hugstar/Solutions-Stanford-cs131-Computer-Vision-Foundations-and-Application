@@ -39,19 +39,21 @@ def kmeans(features, k, num_iters=100):
         for i, feature in enumerate(features):
             # print('len assignments {}, i {}'.format(len(assignments), i))
             assignments[i] = np.argmin([np.linalg.norm(feature-x) for x in centers])
-        # Update centers
 
+        # Update centers
         for j in range(k):
+            # Get all the points in each center
             points_belonging_to_center = [features[x] for x in range(k) if assignments[x]== j]
             if len(points_belonging_to_center) != 0:
                 centers[j] = np.mean(points_belonging_to_center, axis=0)
-            print ('j ', j , centers[j])
-        ### END YOUR CODE
+
+        # At the end of each iterations, check if assignment hasn't changed
         if np.array_equal(prev_assignments, assignments):
-            return assignments
-        else:
-            prev_assignments = assignments.copy()
-    print (np.unique(assignments, return_counts=True))
+            break
+        prev_assignments = assignments.copy()
+        ### END YOUR CODE
+
+
     return assignments
 
 def kmeans_fast(features, k, num_iters=100):
@@ -82,10 +84,25 @@ def kmeans_fast(features, k, num_iters=100):
     idxs = np.random.choice(N, size=k, replace=False)
     centers = features[idxs]
     assignments = np.zeros(N)
-
+    prev_assignments = assignments.copy()
     for n in range(num_iters):
         ### YOUR CODE HERE
-        pass
+        # Calculate nearest center
+        for i, feature in enumerate(features):
+            # print('len assignments {}, i {}'.format(len(assignments), i))
+            assignments[i] = np.argmin([np.linalg.norm(feature-x) for x in centers])
+
+        # Update centers
+        for j in range(k):
+            # Get all the points in each center
+            points_belonging_to_center = [features[x] for x in range(k) if assignments[x]== j]
+            if len(points_belonging_to_center) != 0:
+                centers[j] = np.mean(points_belonging_to_center, axis=0)
+
+        # At the end of each iterations, check if assignment hasn't changed
+        if np.array_equal(prev_assignments, assignments):
+            break
+        prev_assignments = assignments.copy()
         ### END YOUR CODE
 
     return assignments
@@ -102,7 +119,7 @@ def hierarchical_clustering(features, k):
         Compute the distance between all pairs of clusters
         Merge the pair of clusters that are closest to each other
 
-    We will use Euclidean distance to defeine distance between two clusters.
+    We will use Euclidean distance to define distance between two clusters.
 
     Recomputing the centroids of all clusters and the distances between all
     pairs of centroids at each step of the loop would be very slow. Thankfully
@@ -132,12 +149,31 @@ def hierarchical_clustering(features, k):
 
     # Assign each point to its own cluster
     assignments = np.arange(N)
+    distances = np.zeros_like(assignments)
     centers = np.copy(features)
     n_clusters = N
 
     while n_clusters > k:
         ### YOUR CODE HERE
-        pass
+        for i, center in enumerate(centers):
+            # print('len assignments {}, i {}'.format(len(assignments), i))
+            all_distances = [np.linalg.norm(center-x) for x in centers ]
+            # In all places of 0 - distance between a point and itself, replace with max value
+            all_distances[all_distances==0] = np.max(all_distances)
+            assignments[i] = np.argmin(all_distances)
+            distances[i] = np.min(all_distances)
+
+        min_distance_idx_1 = np.argmin(distances)
+        min_distance_idx_2 = assignments[min_distance_idx_1]
+
+        new_centers = np.zeros((center.shape[0]-1))
+        for j in range(len(new_centers)):
+            if j != min(min_distance_idx_1, min_distance_idx_2):
+                new_centers[j] = centers[j]
+            else:
+                new_centers[j] = np.mean([centers[min_distance_idx_1], centers[min_distance_idx_2]], axis=0)
+        centers = new_centers
+
         ### END YOUR CODE
 
     return assignments
@@ -158,7 +194,7 @@ def color_features(img):
     features = np.zeros((H*W, C))
 
     ### YOUR CODE HERE
-    pass
+    features = img.reshape((H*W, C))
     ### END YOUR CODE
 
     return features
@@ -184,9 +220,14 @@ def color_position_features(img):
     H, W, C = img.shape
     color = img_as_float(img)
     features = np.zeros((H*W, C+2))
-
+    print(H, W)
     ### YOUR CODE HERE
-    pass
+    # features = np.dstack((np.array(color).reshape((H*W, C)), np.mgrid[:H,:W]))
+    features[:,:C] = color.reshape((-1,C))
+    features[:,C] = np.mgrid[:H, :W][0].reshape((H*W))
+    features[:,C+1] = np.mgrid[:H, :W][1].reshape((H*W))
+    features -= np.mean(features, axis=0)
+    features /= np.std(features, axis=0)
     ### END YOUR CODE
 
     return features
@@ -226,7 +267,8 @@ def compute_accuracy(mask_gt, mask):
 
     accuracy = None
     ### YOUR CODE HERE
-    pass
+
+    accuracy = float(np.sum(np.logical_and(mask_gt, mask)) + np.sum(np.logical_and(1-mask_gt, 1-mask))) / np.size(mask)
     ### END YOUR CODE
 
     return accuracy
