@@ -280,9 +280,30 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
 
     cells = np.zeros((rows, cols, n_bins))
 
-    # Compute histogram per cell
-    ### YOUR CODE HERE
 
+    ### YOUR CODE HERE
+    # For each block - create a histogram
+    for i in range(rows):
+        for j in range(cols):
+            for z in range(pixels_per_cell[0]):
+                for t in range(pixels_per_cell[1]):
+                    # Divide the cell's value between it's 2 closest bins
+                    distance_to_lower_bin = theta_cells[i][j][z][t] % degrees_per_bin
+                    division_ratio = float(distance_to_lower_bin) / degrees_per_bin
+                    lower_bin_num = (int(np.trunc(theta_cells[i][j][z][t] / degrees_per_bin))) % 9
+
+                    # Since the angles are circular - 0 comes after 8.
+
+                    upper_bin_num = (lower_bin_num + 1) % 9
+                    # print('value {}, lower bin {}'.format(theta_cells[i][j][z][t], lower_bin_num))
+                    cells[i][j][upper_bin_num] += (division_ratio*G_cells[i][j][z][t])
+                    # print(i,j,lower_bin_num)
+                    cells[i][j][lower_bin_num] += ((1-division_ratio) * G_cells[i][j][z][t])
+
+            # Normalize
+            cells[i][j] = cells[i][j] / np.linalg.norm(cells[i][j])
+    block = cells.flatten()
     ### YOUR CODE HERE
     
     return block
+
