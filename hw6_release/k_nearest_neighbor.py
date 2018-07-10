@@ -27,7 +27,11 @@ def compute_distances(X1, X2):
     #
     # HINT: Try to formulate the l2 distance using matrix multiplication
 
+    # (x-y)^2 == x^2 + y^2 -2xy
+    dists = np.sum(X1, axis=1)[:, np.newaxis] + np.sum(X2 ** 2, axis=1) -2 * np.dot(X1, X2.T)
+
     pass
+
     # END YOUR CODE
 
     assert dists.shape == (M, N), "dists should have shape (M, N), got %s" % dists.shape
@@ -49,11 +53,12 @@ def predict_labels(dists, y_train, k=1):
     """
     num_test, num_train = dists.shape
     y_pred = np.zeros(num_test, dtype=np.int)
-
     for i in range(num_test):
+
         # A list of length k storing the labels of the k nearest neighbors to
         # the ith test point.
         closest_y = []
+
         # Use the distance matrix to find the k nearest neighbors of the ith
         # testing point, and use self.y_train to find the labels of these
         # neighbors. Store these labels in closest_y.
@@ -65,8 +70,15 @@ def predict_labels(dists, y_train, k=1):
         # label.
 
         # YOUR CODE HERE
-        pass
+
+        # Get closest args and select first k
+        # Sort the args, take k smallest, get their labels, choose one with maximal count (maximal number of occurances)
+        closest_y = y_train[np.argsort(dists[i])[:k]]
+        most_common = max(set(closest_y), key=list(closest_y).count)
+        y_pred[i] = most_common
+
         # END YOUR CODE
+
 
     return y_pred
 
@@ -92,7 +104,7 @@ def split_folds(X_train, y_train, num_folds):
         y_train: numpy array of shape (N,) containing the label of each example
         num_folds: number of folds to split the data into
 
-    jeturns:
+    returns:
         X_trains: numpy array of shape (num_folds, train_size * (num_folds-1) / num_folds, D)
         y_trains: numpy array of shape (num_folds, train_size * (num_folds-1) / num_folds)
         X_vals: numpy array of shape (num_folds, train_size / num_folds, D)
@@ -111,7 +123,20 @@ def split_folds(X_train, y_train, num_folds):
 
     # YOUR CODE HERE
     # Hint: You can use the numpy array_split function.
-    pass
+
+    # Split the array X_train, y_train sets. IMPORTANT: - we assume they are uniformly shuffled.
+    X_train_splitted = np.array(np.array_split(X_train, num_folds))
+    y_train_splitted = np.array(np.array_split(y_train, num_folds))
+    for i in range(num_folds):
+
+        # For indexing - generate a boolean array with False in the index we use as validation
+        # Select the splitted parts to use, merge them afterwards with the reshape function
+        X_trains[i] = X_train_splitted[(np.arange(num_folds)!=i)].reshape((-1, X_trains.shape[-1]))
+        X_vals[i] = X_train_splitted[i]
+
+        y_trains[i] = y_train_splitted[(np.arange(num_folds)!=i)].reshape((-1, y_trains.shape[-1]))
+        y_vals[i] = y_train_splitted[i]
+
     # END YOUR CODE
 
     return X_trains, y_trains, X_vals, y_vals
