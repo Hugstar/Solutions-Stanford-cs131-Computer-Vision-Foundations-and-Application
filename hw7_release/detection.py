@@ -21,7 +21,7 @@ def hog_feature(image, pixel_per_cell = 8):
         hogImage: an image representation of hog provided by skimage
     '''
     ### YOUR CODE HERE
-    pass
+    hogFeature, hogImage = feature.hog(image, pixels_per_cell=(pixel_per_cell, pixel_per_cell), visualise=True)
     ### END YOUR CODE
     return (hogFeature, hogImage)
 
@@ -47,15 +47,35 @@ def sliding_window(image, base_score, stepSize, windowSize, pixel_per_cell=8):
     # slide a window across the image
     (max_score, maxr, maxc) = (0,0,0)
     winH, winW = windowSize
+    print('window size ', windowSize)
     H,W = image.shape
     pad_image = np.lib.pad(image, ((winH//2,winH-winH//2),(winW//2, winW-winW//2)), mode='constant')
     response_map = np.zeros((H//stepSize+1, W//stepSize+1))
     
     ### YOUR CODE HERE
-    pass
+    # Start from 0,0 in pad image/
+    for row in np.arange(0, H+1, stepSize):
+        # print('row {}'.format(row))
+        for col in np.arange(0, W+1, stepSize):
+            # print('col {}'.format(col))
+            # continue
+            img_patch = pad_image[row: row+winH, col: col+winW]
+            img_patch_hog = feature.hog(img_patch, pixels_per_cell=(pixel_per_cell, pixel_per_cell))
+            assert img_patch_hog.shape == base_score.shape
+            score = np.dot(img_patch_hog, base_score)
+            response_map[row//stepSize, col//stepSize] = score
+
+            # Update max score if necessary
+            if score > max_score:
+                max_score = score
+                maxc, maxr = col, row
+                # print('max - ({},{})'.format(maxr, maxc))
+
+    response_map = resize(response_map, image.shape[0:2])
+    assert response_map.shape[0:2] == image.shape[0:2]
+    maxr,maxc = maxr-winH//2, maxc-winW//2
     ### END YOUR CODE
-    
-    
+
     return (max_score, maxr, maxc, response_map)
 
 
@@ -81,7 +101,14 @@ def pyramid(image, scale=0.9, minSize=(200, 100)):
     images.append((current_scale, image))
     # keep looping over the pyramid
     ### YOUR CODE HERE
-    pass
+    new_h, new_w = [x * 0.9 for x in images[-1][-1].shape[0:2]]
+    while(new_h > minSize[0] and new_w > minSize[1]):
+        new_img = rescale(images[-1][-1], scale)
+        current_scale *= scale
+        images.append((current_scale, new_img))
+        print ('added image with shape {}'.format(new_img.shape))
+        new_h, new_w = [x * 0.9 for x in images[-1][-1].shape[0:2]]
+
     ### END YOUR CODE
     return images
 
@@ -108,8 +135,17 @@ def pyramid_score(image,base_score, shape, stepSize=20, scale = 0.9, pixel_per_c
     max_response_map =np.zeros(image.shape)
     images = pyramid(image, scale)
     ### YOUR CODE HERE
-    pass
+    for curr_image in images:
+        score, r, c, rmap = sliding_window(curr_image[-1], base_score, stepSize, shape, pixel_per_cell=pixel_per_cell)
+        if score > max_score:
+            max_score = score
+            maxr = r
+            maxc = c
+            max_response_map = rmap
+            max_scale = curr_image[0]
     ### END YOUR CODE
+    max_response_map = resize(max_response_map, image.shape[0:2])
+    assert max_response_map.shape[0:2] == image.shape[0:2]
     return max_score, maxr, maxc, max_scale, max_response_map
 
 
@@ -132,9 +168,20 @@ def compute_displacement(part_centers, face_shape):
         sigma: (1,2) vector
         
     '''
+    # d - each row is the main center (face center) minus the part center
+    # Assumption - center of the face is the center of the image
+    # mu - average of d rows
+    # sigma standard deviation among the rows
+
     d = np.zeros((part_centers.shape[0],2))
     ### YOUR CODE HERE
-    pass
+    face_center = [x/2 for x in face_shape]
+    d = face_center - part_centers
+    # print('d', d)
+    mu = np.mean(d, axis=0)[np.newaxis,...].astype(np.int64)
+    sigma = np.std(d,axis=0)[np.newaxis,...].astype(np.int64)
+    assert mu.shape == (1,2), 'mu shape is {}'.format(mu.shape)
+    assert sigma.shape == (1, 2), 'sigma shape is {}'.format(sigma.shape)
     ### END YOUR CODE
     return mu, sigma
         
@@ -149,9 +196,18 @@ def shift_heatmap(heatmap, mu):
         Returns:
             new_heatmap: np array of (h,w)
     '''
+    new_heatmap = np.zeros_like(heatmap)
+
     ### YOUR CODE HERE
-    pass
-    ### END YOUR CODE
+    # Convert from (1,2) to (2,)
+    if np.array(mu).shape == (1,2):
+        mu = mu[0]
+    # Normalize - divide by max value
+    heatmap /= np.max(heatmap)
+    mom = lambda s: s if s<0 else None
+    non = lambda s: max(0,s)
+    # Nice shifting trick that handles also non-positive number, worth taking time to understand :)
+    new_heatmap[non(-mu[0]):mom(-mu[0]), non(-mu[1]):mom(-mu[1])] = heatmap[non(-mu[0]):mom(-mu[0]), non(-mu[1]):mom(-mu[1])]
     return new_heatmap
     
 
@@ -170,7 +226,19 @@ def gaussian_heatmap(heatmap_face, heatmaps, sigmas):
         new_image: an image np array of (h,w) after gaussian convoluted
     '''
     ### YOUR CODE HERE
-    pass
+    max_heatmap_val = - 1
+    # print('sigmas', sigmas)
+    for curr_heatmap, sigma in zip(heatmaps, sigmas):
+        # print('sigma ', sigma)
+        for sig in sigma[0]:
+            # print('curr_heatmap.shape', curr_heatmap.shape)
+            # print('sig', sig)
+            curr_filtered_hm = gaussian(curr_heatmap, sigma=sig)
+            curr_filtered_hm += heatmap_face
+            if np.max(curr_filtered_hm) > max_heatmap_val:
+                max_heatmap_val = np.max(curr_filtered_hm)
+                r,c = np.where(curr_filtered_hm == curr_filtered_hm.max())
+                heatmap = curr_heatmap
     ### END YOUR CODE
     return heatmap, r , c
             
